@@ -1,0 +1,86 @@
+name: Build corrected BlenderPhysics 1.21.1
+
+on:
+  push:
+    branches:
+      - repair-analysis
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Extract original project
+        run: |
+          mkdir -p work
+          unzip -q BlenderPhysics-mod-1.21.1.zip -d work
+          test -f work/blenderphysics/build.gradle
+
+      - name: Apply safe repair and water-performance patch
+        run: |
+          python3 tools/repair_project.py work/blenderphysics
+
+      - name: Build mod JAR with Gradle
+        id: build
+        continue-on-error: true
+        working-directory: work/blenderphysics
+        run: gradle build --stacktrace
+
+      - name: Assemble corrected source ZIP with JAR
+        if: steps.build.outcome == 'success'
+        run: |
+          mkdir -p dist/BlenderPhysics-mod-1.21.1
+          rsync -a --exclude='.gradle/' --exclude='build/' work/blenderphysics/ dist/BlenderPhysics-mod-1.21.1/
+          mkdir -p dist/BlenderPhysics-mod-1.21.1/build/libs
+          cp work/blenderphysics/build/libs/*.jar dist/BlenderPhysics-mod-1.21.1/build/libs/
+          mkdir -p dist
+          cd dist
+          zip -qr BlenderPhysics-1.21.1-CORREGIDO.zip BlenderPhysics-mod-1.21.1
+
+      - name: Upload corrected ZIP and JAR
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlenderPhysics-1.21.1-CORREGIDO
+          path: |
+            dist/BlenderPhysics-1.21.1-CORREGIDO.zip
+            work/blenderphysics/build/libs/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload diagnostic source and build reports
+        if: always() && steps.build.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlenderPhysics-build-diagnostic
+          path: |
+            work/blenderphysics/src/
+            work/blenderphysics/build/reports/
+            work/blenderphysics/build.gradle
+            work/blenderphysics/gradle.properties
+            work/blenderphysics/settings.gradle
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Fail when Gradle build fails
+        if: steps.build.outcome != 'success'
+        run: |
+          echo "Gradle build did not complete successfully. See uploaded diagnostic artifact."
+          exit 1
