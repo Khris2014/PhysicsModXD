@@ -1,0 +1,60 @@
+name: Diagnose BlenderPhysics 1.21.1
+
+on:
+  push:
+    branches:
+      - repair-analysis
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extract original project ZIP
+        run: |
+          mkdir -p work
+          unzip -q BlenderPhysics-mod-1.21.1.zip -d work
+          test -f work/blenderphysics/build.gradle
+          echo "Extracted project successfully"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.8'
+
+      - name: Run Gradle build
+        id: compile
+        continue-on-error: true
+        working-directory: work/blenderphysics
+        run: gradle build --stacktrace
+
+      - name: Upload source and build outputs for inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlenderPhysics-diagnostic
+          path: |
+            work/blenderphysics/src/
+            work/blenderphysics/build/
+            work/blenderphysics/build.gradle
+            work/blenderphysics/gradle.properties
+            work/blenderphysics/settings.gradle
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Report build status
+        if: steps.compile.outcome == 'failure'
+        run: |
+          echo "Gradle build failed. Diagnostic artifact uploaded."
+          exit 1
