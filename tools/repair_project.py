@@ -354,6 +354,42 @@ if p.exists():
     if "## Agua personalizada y rendimiento" not in s:
         p.write_text(s + note, encoding="utf-8", newline="\n")
 
+
+# Minecraft 1.21.1/Yarn compile compatibility fixes verified by the first CI build.
+p = root / "src/main/java/com/blenderphysics/physics/SPHSolver.java"
+s = p.read_text(encoding="utf-8")
+needle = """\tprivate void computeForces(FluidParticleBuffer buf, long worldKey, BlenderPhysicsConfig cfg, int start, int end) {
+\t\tfloat gravity = -0.30f * cfg.gravity; // escala a unidades de bloque/tick^2
+\t\tfor (int i = start; i < end; i++) {
+"""
+replacement = needle + "\t\t\tfinal int particleIndex = i;\n"
+if s.count(needle) != 1:
+    raise RuntimeError("SPHSolver computeForces compatibility anchor not found exactly once")
+s = s.replace(needle, replacement)
+if s.count("if (j == i || !buf.active[j] || buf.worldSeed[j] != worldKey) return;") != 1:
+    raise RuntimeError("SPHSolver lambda anchor not found exactly once")
+s = s.replace(
+    "if (j == i || !buf.active[j] || buf.worldSeed[j] != worldKey) return;",
+    "if (j == particleIndex || !buf.active[j] || buf.worldSeed[j] != worldKey) return;",
+)
+p.write_text(s, encoding="utf-8", newline="\\n")
+
+p = root / "src/main/java/com/blenderphysics/physics/FluidSimulationWorld.java"
+s = p.read_text(encoding="utf-8")
+old = "buffer.groupId[idx] = (int) (center.x * 73856093 ^ (int) center.y * 19349663 ^ (int) center.z * 83492791);"
+new = "buffer.groupId[idx] = ((int) center.x * 73856093) ^ ((int) center.y * 19349663) ^ ((int) center.z * 83492791);"
+if s.count(old) != 1:
+    raise RuntimeError("FluidSimulationWorld XOR anchor not found exactly once")
+p.write_text(s.replace(old, new), encoding="utf-8", newline="\\n")
+
+p = root / "src/main/java/com/blenderphysics/registry/ModEntities.java"
+s = p.read_text(encoding="utf-8")
+s = s.replace("import net.minecraft.entity.EntityDimensions;\\n", "")
+if ".dimensions(EntityDimensions.fixed(1.0f, 1.0f))" not in s:
+    raise RuntimeError("ModEntities dimensions anchor not found")
+s = s.replace(".dimensions(EntityDimensions.fixed(1.0f, 1.0f))", ".dimensions(1.0f, 1.0f)")
+p.write_text(s, encoding="utf-8", newline="\\n")
+
 # Stop if any stale bomb registration survived.
 java = "\n".join(p.read_text(encoding="utf-8") for p in (root / "src").rglob("*.java"))
 for stale in ["WATER_BOMB_ENTITY", "LAVA_BOMB_ENTITY", "SLIME_BOMB_ENTITY", "ModItems.WATER_BOMB", "new FluidBombItem"]:
