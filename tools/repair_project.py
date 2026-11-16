@@ -390,6 +390,25 @@ if ".dimensions(EntityDimensions.fixed(1.0f, 1.0f))" not in s:
 s = s.replace(".dimensions(EntityDimensions.fixed(1.0f, 1.0f))", ".dimensions(1.0f, 1.0f)")
 p.write_text(s, encoding="utf-8", newline="\n")
 
+
+# Client renderer uses Yarn's ModelTransformationMode name in 1.21.1.
+p = root / "src/client/java/com/blenderphysics/client/PhysicsRigidBodyEntityRenderer.java"
+s = p.read_text(encoding="utf-8")
+s = s.replace(
+    "import net.minecraft.item.ItemDisplayContext;",
+    "import net.minecraft.client.render.model.json.ModelTransformationMode;",
+)
+s = s.replace("ItemDisplayContext", "ModelTransformationMode")
+if "import net.minecraft.client.render.model.json.ModelTransformationMode;" not in s:
+    s = s.replace(
+        "package com.blenderphysics.client;",
+        "package com.blenderphysics.client;\n\nimport net.minecraft.client.render.model.json.ModelTransformationMode;",
+        1,
+    )
+if "ModelTransformationMode.GROUND" not in s:
+    raise RuntimeError("Renderer transformation mode replacement was not applied")
+p.write_text(s, encoding="utf-8", newline="\n")
+
 # Stop if any stale bomb registration survived.
 java = "\n".join(p.read_text(encoding="utf-8") for p in (root / "src").rglob("*.java"))
 for stale in ["WATER_BOMB_ENTITY", "LAVA_BOMB_ENTITY", "SLIME_BOMB_ENTITY", "ModItems.WATER_BOMB", "new FluidBombItem"]:
