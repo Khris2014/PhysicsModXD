@@ -372,7 +372,7 @@ s = s.replace(
     "if (j == i || !buf.active[j] || buf.worldSeed[j] != worldKey) return;",
     "if (j == particleIndex || !buf.active[j] || buf.worldSeed[j] != worldKey) return;",
 )
-p.write_text(s, encoding="utf-8", newline="\\n")
+p.write_text(s, encoding="utf-8", newline="\n")
 
 p = root / "src/main/java/com/blenderphysics/physics/FluidSimulationWorld.java"
 s = p.read_text(encoding="utf-8")
@@ -380,15 +380,15 @@ old = "buffer.groupId[idx] = (int) (center.x * 73856093 ^ (int) center.y * 19349
 new = "buffer.groupId[idx] = ((int) center.x * 73856093) ^ ((int) center.y * 19349663) ^ ((int) center.z * 83492791);"
 if s.count(old) != 1:
     raise RuntimeError("FluidSimulationWorld XOR anchor not found exactly once")
-p.write_text(s.replace(old, new), encoding="utf-8", newline="\\n")
+p.write_text(s.replace(old, new), encoding="utf-8", newline="\n")
 
 p = root / "src/main/java/com/blenderphysics/registry/ModEntities.java"
 s = p.read_text(encoding="utf-8")
-s = s.replace("import net.minecraft.entity.EntityDimensions;\\n", "")
+s = s.replace("import net.minecraft.entity.EntityDimensions;\n", "")
 if ".dimensions(EntityDimensions.fixed(1.0f, 1.0f))" not in s:
     raise RuntimeError("ModEntities dimensions anchor not found")
 s = s.replace(".dimensions(EntityDimensions.fixed(1.0f, 1.0f))", ".dimensions(1.0f, 1.0f)")
-p.write_text(s, encoding="utf-8", newline="\\n")
+p.write_text(s, encoding="utf-8", newline="\n")
 
 # Stop if any stale bomb registration survived.
 java = "\n".join(p.read_text(encoding="utf-8") for p in (root / "src").rglob("*.java"))
