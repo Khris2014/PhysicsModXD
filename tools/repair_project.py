@@ -409,6 +409,25 @@ if "ModelTransformationMode.GROUND" not in s:
     raise RuntimeError("Renderer transformation mode replacement was not applied")
 p.write_text(s, encoding="utf-8", newline="\n")
 
+
+# Register the client-only configuration command through Fabric API's callback.
+p = root / "src/client/java/com/blenderphysics/client/BlenderPhysicsClientMod.java"
+s = p.read_text(encoding="utf-8")
+s = s.replace(
+    "import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;",
+    "import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;",
+)
+old = """\t\tClientCommandManager.DISPATCHER.register(
+\t\t\t\tliteral("bp").then(literal("configui").executes(this::openConfigUi)));
+"""
+new = """\t\tClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+\t\t\t\tdispatcher.register(literal("bp").then(literal("configui").executes(this::openConfigUi))));
+"""
+if s.count(old) != 1:
+    raise RuntimeError("Client config command registration block not found exactly once")
+s = s.replace(old, new)
+p.write_text(s, encoding="utf-8", newline="\n")
+
 # Stop if any stale bomb registration survived.
 java = "\n".join(p.read_text(encoding="utf-8") for p in (root / "src").rglob("*.java"))
 for stale in ["WATER_BOMB_ENTITY", "LAVA_BOMB_ENTITY", "SLIME_BOMB_ENTITY", "ModItems.WATER_BOMB", "new FluidBombItem"]:
